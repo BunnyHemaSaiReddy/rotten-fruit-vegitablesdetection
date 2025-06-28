@@ -3,7 +3,8 @@ import numpy as np
 from flask import Flask, render_template, request, redirect, url_for, flash
 from werkzeug.utils import secure_filename
 import tensorflow as tf
-from tensorflow.keras.models import load_model
+from keras.layers import TFSMLayer
+from keras import Input, Model
 from tensorflow.keras.preprocessing import image
 
 app = Flask(__name__)
@@ -20,15 +21,17 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 # Ensure upload directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Load the trained model
+# Load the model from TensorFlow SavedModel format
 try:
-    model = load_model('converted_model.h5')
-    print("Model loaded successfully!")
+    layer = TFSMLayer("converted_model_tf", call_endpoint="serving_default")
+    inp = Input(shape=(224, 224, 3))
+    model = Model(inputs=inp, outputs=layer(inp))
+    print("✅ Model loaded successfully from SavedModel format.")
 except Exception as e:
-    print(f"Error loading model: {e}")
+    print(f"❌ Error loading model: {e}")
     model = None
 
-# Class names for 28 classes
+# Class names for 28 categories
 CLASS_NAMES = [
     'Apple_healthy', 'Apple_rotten', 'Banana_healthy', 'Banana_rotten',
     'Bell_pepper_healthy', 'Bell_pepper_rotten', 'Carrot_healthy', 'Carrot_rotten',
@@ -38,12 +41,7 @@ CLASS_NAMES = [
     'Strawberry_healthy', 'Strawberry_rotten', 'Tomato_healthy', 'Tomato_rotten',
     'Watermelon_healthy', 'Watermelon_rotten', 'Onion_healthy', 'Onion_rotten'
 ]
-@app.route('/')
-def home():
-    return "Hello, Smart Sorting!"
 
-if __name__ == '__main__':
-    app.run()
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -55,7 +53,7 @@ def preprocess_image(img_path):
         img_array = tf.keras.applications.mobilenet_v2.preprocess_input(img_array)
         return img_array
     except Exception as e:
-        print(f"Error preprocessing image: {e}")
+        print(f"❌ Error preprocessing image: {e}")
         return None
 
 def predict_image(img_path):
@@ -92,14 +90,17 @@ def predict():
     if 'file' not in request.files:
         flash('No file selected')
         return redirect(request.url)
+    
     file = request.files['file']
     if file.filename == '':
         flash('No file selected')
         return redirect(request.url)
+    
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
+
         result = predict_image(filepath)
         if result:
             return render_template('index.html',
@@ -111,8 +112,6 @@ def predict():
     else:
         flash('Invalid file type. Please upload PNG, JPG, JPEG, or GIF files.')
         return redirect(url_for('index'))
-
-# Add the missing routes for navigation links:
 
 @app.route('/features')
 def features():
@@ -126,7 +125,6 @@ def use_cases():
 def about():
     return render_template('about.html')
 
-# Your other routes if any...
-
+# For local testing (Render ignores this)
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
