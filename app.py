@@ -3,7 +3,7 @@ import numpy as np
 from flask import Flask, render_template, request, redirect, url_for, flash
 from werkzeug.utils import secure_filename
 import tensorflow as tf
-from keras.layers import TFSMLayer
+from keras.saving import TFSMLayer  # ✅ Correct for Keras 3
 from keras import Input, Model
 from tensorflow.keras.preprocessing import image
 
@@ -21,7 +21,7 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 # Ensure upload directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Load the model from TensorFlow SavedModel format
+# Load TensorFlow SavedModel
 try:
     layer = TFSMLayer("converted_model_tf", call_endpoint="serving_default")
     inp = Input(shape=(224, 224, 3))
@@ -125,6 +125,6 @@ def use_cases():
 def about():
     return render_template('about.html')
 
-# For local testing (Render ignores this)
+# For local testing (ignored in production)
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
